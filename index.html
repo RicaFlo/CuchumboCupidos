@@ -182,7 +182,9 @@
   const FIREBASE_URL = "https://cuchumbo-cupidos-default-rtdb.firebaseio.com/cuchumbo.json";
 
   const TOTAL = 7;
-  const ORDEN_TURNOS = ['Allison', 'Tiffany', 'Marilyn', 'Nader', 'Juan Ramon', 'Sarahy', 'Ricardo'];
+  
+  // 🔥 ORDEN ACTUALIZADO: Ricardo en segundo lugar
+  const ORDEN_TURNOS = ['Allison', 'Ricardo', 'Tiffany', 'Marilyn', 'Nader', 'Sarahy', 'Juan Ramon'];
   const PERSONAS = [...ORDEN_TURNOS];
 
   const estadoInicial = {
@@ -269,7 +271,7 @@
     fetch(FIREBASE_URL)
       .then(res => res.json())
       .then(data => {
-        // 🔥 VALIDACIÓN: Si los datos existen pero están corruptos o viejos, los reiniciamos
+        // Validación: Si los datos existen pero están corruptos o viejos, los reiniciamos
         if (data && Array.isArray(data.yaSalieron) && Array.isArray(data.asignaciones) && typeof data.turno === 'number') {
           state = data;
         } else {
@@ -288,7 +290,6 @@
       try {
         const res = await fetch(FIREBASE_URL);
         const data = await res.json();
-        // Validación también en el ciclo de actualización
         if (data && Array.isArray(data.yaSalieron)) {
           if (JSON.stringify(data) !== JSON.stringify(state)) {
             state = data;
@@ -302,7 +303,6 @@
   }
 
   function sortear() {
-    // Validación extra por si acaso
     if (!state.yaSalieron) state.yaSalieron = [];
     if (state.turno >= TOTAL || state.fase !== 'esperando' || isProcessing) return;
 
