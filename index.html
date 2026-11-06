@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuchumbo Navideño</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    font-family: 'Nunito', sans-serif;
+    background-color: #fdfbf7;
+    background-image: radial-gradient(#e5e0d8 1px, transparent 1px);
+    background-size: 20px 20px;
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    color: #333;
+  }
+
+  .card {
+    background: white;
+    border-radius: 16px;
+    padding: 30px 25px;
+    max-width: 450px;
+    width: 100%;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    border: 2px solid #e8e2d9;
+    text-align: center;
+  }
+
+  h1 { 
+    color: #b91c1c; 
+    margin-bottom: 5px; 
+    font-size: 1.6em; 
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .subtitle { 
+    color: #666; 
+    margin-bottom: 25px; 
+    font-size: 0.95em; 
+  }
+
+  .turno-box {
+    background: #f0fdf4;
+    border: 1px solid #bbf7d0;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+  }
+  
+  .turno-box .label { 
+    font-size: 0.8em; 
+    color: #166534; 
+    text-transform: uppercase; 
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    margin-bottom: 5px; 
+  }
+  
+  .turno-box .quien { 
+    font-size: 1.3em; 
+    font-weight: 800; 
+    color: #15803d; 
+  }
+
+  .contador {
+    font-size: 0.9em;
+    color: #888;
+    margin-bottom: 20px;
+  }
+  
+  .contador strong { 
+    color: #b91c1c; 
+    font-size: 1.1em;
+  }
+
+  .ruleta {
+    font-size: 1.8em;
+    margin: 30px 0;
+    min-height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    color: #333;
+    padding: 0 10px;
+    word-break: break-word;
+    transition: color 0.3s;
+  }
+  
+  .ruleta.preparado { 
+    color: #999; 
+    font-size: 1.2em; 
+    font-weight: 600; 
+  }
+
+  button {
+    background-color: #b91c1c;
+    color: white; 
+    border: none; 
+    padding: 16px 20px; 
+    font-size: 1.1em;
+    border-radius: 10px; 
+    cursor: pointer; 
+    font-weight: 700;
+    font-family: inherit;
+    transition: background-color 0.2s;
+    width: 100%;
+    box-shadow: 0 4px 6px rgba(185, 28, 28, 0.2);
+  }
+  
+  button:hover:not(:disabled) { 
+    background-color: #991b1b; 
+  }
+  
+  button:disabled { 
+    background-color: #d1d5db; 
+    color: #6b7280;
+    cursor: not-allowed; 
+    box-shadow: none;
+  }
+  
+  button.limpiar { 
+    background-color: #15803d; 
+    box-shadow: 0 4px 6px rgba(21, 128, 61, 0.2);
+  }
+  
+  button.limpiar:hover:not(:disabled) { 
+    background-color: #166534; 
+  }
+
+  .agotado {
+    color: #166534; 
+    font-size: 1em; 
+    font-weight: 700; 
+    margin-top: 20px;
+    padding: 15px; 
+    background: #f0fdf4; 
+    border-radius: 10px; 
+    border: 1px solid #bbf7d0;
+  }
+  
+  .status { 
+    font-size: 0.75em; 
+    color: #9ca3af; 
+    margin-top: 20px; 
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🎄 Cuchumbo Navideño</h1>
+  <p class="subtitle">Cada quien presiona en su turno para ver a quién le toca</p>
+
+  <div class="turno-box">
+    <div class="label">Turno actual</div>
+    <div class="quien" id="turnoActual">Cargando...</div>
+  </div>
+
+  <div class="contador">
+    Faltan <strong id="restantes">...</strong> personas por jugar
+  </div>
+
+  <div class="ruleta preparado" id="ruleta">Conectando...</div>
+
+  <button id="btnAccion" disabled>Esperando...</button>
+
+  <div id="agotadoMsg"></div>
+  <div class="status" id="statusMsg">🟡 Iniciando conexión</div>
+</div>
+
+<script>
+  // URL de Firebase
+  const FIREBASE_URL = "https://cuchumbo-cupidos-default-rtdb.firebaseio.com/cuchumbo.json";
+
+  const TOTAL = 7;
+  const ORDEN_TURNOS = ['Allison', 'Tiffany', 'Marilyn', 'Nader', 'Juan Ramon', 'Sarahy', 'Ricardo'];
+  const PERSONAS = [...ORDEN_TURNOS];
+
+  const estadoInicial = {
+    turno: 0,
+    yaSalieron: [],
+    fase: 'esperando',
+    ultimoResultado: null,
+    asignaciones: []
+  };
+
+  let state = { ...estadoInicial };
+  let isProcessing = false;
+
+  const ruletaEl = document.getElementById('ruleta');
+  const btn = document.getElementById('btnAccion');
+  const restantesEl = document.getElementById('restantes');
+  const agotadoMsg = document.getElementById('agotadoMsg');
+  const turnoActualEl = document.getElementById('turnoActual');
+  const statusMsg = document.getElementById('statusMsg');
+
+  function actualizarUI() {
+    if (!state) return;
+
+    const restantes = TOTAL - state.turno;
+    restantesEl.textContent = restantes;
+
+    if (state.fase === 'esperando') {
+      if (state.turno < TOTAL) {
+        turnoActualEl.textContent = ORDEN_TURNOS[state.turno];
+      } else {
+        turnoActualEl.textContent = '—';
+      }
+    } else {
+      turnoActualEl.textContent = ORDEN_TURNOS[state.turno - 1] + ' (ya jugó)';
+    }
+
+    if (state.turno >= TOTAL && state.fase === 'esperando') {
+      btn.disabled = true;
+      btn.textContent = 'Juego terminado';
+      btn.classList.remove('limpiar');
+      ruletaEl.classList.add('preparado');
+      ruletaEl.textContent = '¡Todos participaron!';
+      agotadoMsg.innerHTML = '<div class="agotado">El cuchumbo ha terminado. ¡Felices fiestas!</div>';
+      return;
+    }
+
+    agotadoMsg.innerHTML = '';
+
+    if (state.fase === 'mostrando') {
+      btn.disabled = false;
+      btn.classList.add('limpiar');
+      btn.textContent = 'Siguiente persona';
+      ruletaEl.classList.remove('preparado');
+      ruletaEl.textContent = `🎁 ${state.ultimoResultado}`;
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('limpiar');
+      btn.textContent = 'Presionar aquí';
+      ruletaEl.classList.add('preparado');
+      if (state.turno < TOTAL) {
+        ruletaEl.textContent = `Listo para ${ORDEN_TURNOS[state.turno]}`;
+      }
+    }
+  }
+
+  async function guardarEnFirebase(nuevoEstado) {
+    try {
+      statusMsg.textContent = "Guardando...";
+      await fetch(FIREBASE_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nuevoEstado)
+      });
+      state = nuevoEstado;
+      actualizarUI();
+      statusMsg.textContent = "🟢 Todo listo";
+    } catch (error) {
+      statusMsg.textContent = "🔴 Error al guardar";
+      alert("Hubo un error de conexión. Revisa tu internet.");
+    }
+  }
+
+  function iniciarSincronizacion() {
+    fetch(FIREBASE_URL)
+      .then(res => res.json())
+      .then(data => {
+        // 🔥 VALIDACIÓN: Si los datos existen pero están corruptos o viejos, los reiniciamos
+        if (data && Array.isArray(data.yaSalieron) && Array.isArray(data.asignaciones) && typeof data.turno === 'number') {
+          state = data;
+        } else {
+          state = { ...estadoInicial };
+          guardarEnFirebase(state);
+        }
+        actualizarUI();
+        statusMsg.textContent = "🟢 Conectado";
+      })
+      .catch(e => {
+        statusMsg.textContent = "🔴 Error de conexión";
+      });
+
+    setInterval(async () => {
+      if (isProcessing) return;
+      try {
+        const res = await fetch(FIREBASE_URL);
+        const data = await res.json();
+        // Validación también en el ciclo de actualización
+        if (data && Array.isArray(data.yaSalieron)) {
+          if (JSON.stringify(data) !== JSON.stringify(state)) {
+            state = data;
+            actualizarUI();
+          }
+        }
+      } catch (e) {
+        statusMsg.textContent = "🔴 Desconectado";
+      }
+    }, 2000);
+  }
+
+  function sortear() {
+    // Validación extra por si acaso
+    if (!state.yaSalieron) state.yaSalieron = [];
+    if (state.turno >= TOTAL || state.fase !== 'esperando' || isProcessing) return;
+
+    const nombreDelTurno = ORDEN_TURNOS[state.turno];
+    const disponibles = PERSONAS
+      .map((nombre, idx) => ({ nombre, idx }))
+      .filter(p => !state.yaSalieron.includes(p.idx) && p.nombre !== nombreDelTurno);
+
+    if (disponibles.length === 0) return;
+
+    isProcessing = true;
+    btn.disabled = true;
+    btn.textContent = "Sorteando...";
+    
+    let ticks = 0;
+    const intervalo = setInterval(() => {
+      const rnd = disponibles[Math.floor(Math.random() * disponibles.length)];
+      ruletaEl.textContent = rnd.nombre;
+      ticks++;
+      
+      if (ticks > 10) {
+        clearInterval(intervalo);
+        const elegido = disponibles[Math.floor(Math.random() * disponibles.length)];
+        
+        const nuevoEstado = {
+          ...state,
+          turno: state.turno + 1,
+          yaSalieron: [...state.yaSalieron, elegido.idx],
+          ultimoResultado: elegido.nombre,
+          fase: 'mostrando',
+          asignaciones: [...state.asignaciones, { quienPresiono: nombreDelTurno, leToco: elegido.nombre }]
+        };
+
+        guardarEnFirebase(nuevoEstado).finally(() => {
+          isProcessing = false;
+        });
+      }
+    }, 100);
+  }
+
+  function limpiarParaSiguiente() {
+    if (state.fase !== 'mostrando' || isProcessing) return;
+    isProcessing = true;
+
+    const nuevoEstado = {
+      ...state,
+      fase: 'esperando',
+      ultimoResultado: null
+    };
+
+    guardarEnFirebase(nuevoEstado).finally(() => {
+      isProcessing = false;
+    });
+  }
+
+  btn.addEventListener('click', () => {
+    if (state.fase === 'esperando') sortear();
+    else if (state.fase === 'mostrando') limpiarParaSiguiente();
+  });
+
+  iniciarSincronizacion();
+</script>
+</body>
+</html>
